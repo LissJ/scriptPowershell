@@ -1,34 +1,39 @@
-$arquivoUsuarios = "C:\Users\Administrator\usuariosGerados\lista_usuarios.csv"
-$SPadrao = "senhaPadrao123!"
-$dominio = "hostname.unique" 
+$csv = "C:\Users\Administrator\usuariosGerados\lista_usuarios.csv"
+$senha = ConvertTo-SecureString "senhaPadrao123!" -AsPlainText -Force
+$dominio = "hostname.unique"
+$ouUsuarios = "OU=Usuarios,DC=hostname,DC=unique"
+$ouGrupos = "OU=Grupos,DC=hostname,DC=unique"
 
-$usuarios = Import-Csv -Path "C:\Users\Administrator\usuariosGerados\lista_usuarios.csv" -Delimiter ";"
-$usuarios | ForEach-Object { Write-Host "Usuario encontrado: $($_.Nome), Grupo: $($_.Grupo)" }
+Import-Csv -Path $csv -Delimiter ";" | ForEach-Object {
+    $nome = $_.Nome
+    $grupo = $_.Grupo
+    $UPN = "$nome@$dominio"
 
+    # criando um usuário, se não existir
+    if (-not (Get-ADUser -Filter "SamAccountName -eq '$nome'" -ErrorAction SilentlyContinue)) {
+        Write-Host "Criando usuário: $nome"
+        New-ADUser -Name $nome -SamAccountName $nome -UserPrincipalName $UPN `
+                   -AccountPassword $senha -Enabled $true -PasswordNeverExpires $false `
+                   -Path $ouUsuarios
 
-foreach ($usuario in $usuarios) {
-    $SamAccountName = $usuario.Nome
-    $UPN = "$SamAccountName@$dominio"
-    $grupo = $usuario.Grupo
-
-    if (-not (Get-ADUser -Filter {SamAccountName -eq $SamAccountName} -ErrorAction SilentlyContinue)) {
-        New-ADUser -Name $usuario.Nome `
-                   -SamAccountName $SamAccountName `
-                   -UserPrincipalName $UPN `
-                   -AccountPassword (ConvertTo-SecureString $SPadrao -AsPlainText -Force) `
-                   -Enabled $true `
-                   -ChangePasswordAtLogon $true `
-                   -Path "CN=Computers,DC=hostname,DC=unique"
+        Set-ADUser -Identity $nome -ChangePasswordAtLogon $true
+        Write-Host "Usuário $nome criado e senha forçada para alteração no primeiro login."
     } else {
-        Write-Host "O usuario $SamAccountName ja existe. Proximo..."
+        Write-Host "Usuário $nome já existe."
     }
 
-    if (-not (Get-ADGroup -Filter {Name -eq $grupo} -ErrorAction SilentlyContinue)) {
-         New-ADGroup -Name $grupo -GroupScope Global -GroupCategory Security -Path "CN=Computers,DC=hostname,DC=unique"
-         Write-Host "Grupo $grupo criado."
+    # criando um grupo, se não existir
+    if (-not (Get-ADGroup -Filter "Name -eq '$grupo'" -ErrorAction SilentlyContinue)) {
+        Write-Host "Criando grupo: $grupo"
+        New-ADGroup -Name $grupo -GroupScope Global -GroupCategory Security -Path $ouGrupos
+        Write-Host "Grupo $grupo criado."
     }
 
-
-    Add-ADGroupMember -Identity $grupo -Members $SamAccountName
-    Write-Host "O usuario $SamAccountName foi adicionado ao grupo $grupo."
+    # adicionando o usuário ao grupo criado
+    if (-not (Get-ADGroupMember -Identity $grupo | Where-Object { $_.SamAccountName -eq $nome })) {
+        Add-ADGroupMember -Identity $grupo -Members $nome
+        Write-Host "Usuário $nome adicionado ao grupo $grupo."
+    } else {
+        Write-Host "Usuário $nome já é membro do grupo $grupo."
+    }
 }
