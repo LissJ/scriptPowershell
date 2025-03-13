@@ -11,15 +11,15 @@ Import-Csv -Path $csv -Delimiter ";" | ForEach-Object {
 
     # criando um usuário, se não existir
     if (-not (Get-ADUser -Filter "SamAccountName -eq '$nome'" -ErrorAction SilentlyContinue)) {
-        Write-Host "Criando usuário: $nome"
+        Write-Host "Criando usuario: $nome"
         New-ADUser -Name $nome -SamAccountName $nome -UserPrincipalName $UPN `
                    -AccountPassword $senha -Enabled $true -PasswordNeverExpires $false `
                    -Path $ouUsuarios
 
         Set-ADUser -Identity $nome -ChangePasswordAtLogon $true
-        Write-Host "Usuário $nome criado e senha forçada para alteração no primeiro login."
+        Write-Host "Usuario $nome criado e senha forçada para alteracao no primeiro login."
     } else {
-        Write-Host "Usuário $nome já existe."
+        Write-Host "Usuario $nome ja existe."
     }
 
     # criando um grupo, se não existir
@@ -32,8 +32,8 @@ Import-Csv -Path $csv -Delimiter ";" | ForEach-Object {
     # adicionando o usuário ao grupo criado
     if (-not (Get-ADGroupMember -Identity $grupo | Where-Object { $_.SamAccountName -eq $nome })) {
         Add-ADGroupMember -Identity $grupo -Members $nome
-        Write-Host "Usuário $nome adicionado ao grupo $grupo."
+        Write-Host "Usuario $nome adicionado ao grupo $grupo."
     } else {
-        Write-Host "Usuário $nome já é membro do grupo $grupo."
+        Write-Host "Usuario $nome ja faz parte do grupo $grupo."
     }
 }
